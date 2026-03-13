@@ -2,6 +2,7 @@ package com.haoyunlai.chatops.agent;
 
 import com.haoyunlai.chatops.model.plan.ExecutionPlan;
 import com.haoyunlai.chatops.model.plan.Step;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.converter.BeanOutputConverter;
@@ -10,39 +11,15 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+@RequiredArgsConstructor
 @Slf4j
 @Component
 public class RouterAgent {
 
-    private final ChatClient chatClient;
+    private final ChatClient routerChatClient; // 大总管的专用 ChatClient (不绑定具体工具，只负责分析和路由)
     private final MonitorWorkerAgent monitorAgent;
     private final BusinessWorkerAgent businessAgent;
     private final ScheduleWorkerAgent scheduleAgent;
-
-    // 注入三个干活的士兵
-    public RouterAgent(ChatClient.Builder builder,
-                       MonitorWorkerAgent monitorAgent,
-                       BusinessWorkerAgent businessAgent,
-                       ScheduleWorkerAgent scheduleAgent) {
-        this.monitorAgent = monitorAgent;
-        this.businessAgent = businessAgent;
-        this.scheduleAgent = scheduleAgent;
-
-        // 为大总管注入灵魂 (不绑定具体的 Tool，只负责分析和路由)
-        this.chatClient = builder
-                .defaultSystem("""
-                        你是一个高级架构师兼系统路由调度大脑 (Supervisor Agent)。
-                        你的职责是：接收用户的自然语言指令，进行安全风控，并将指令拆解为有序的执行步骤。
-                        系统中有三个专门的子 Agent：
-                        1. MONITOR：负责查询系统健康状态、Trace链路监控等。
-                        2. BUSINESS：负责新增用户、发送优惠券、清理缓存等业务操作。
-                        3. SCHEDULE：负责在分布式调度中心动态创建、启停定时任务。
-                        
-                        请严格按照 JSON 格式输出拆解计划 (ExecutionPlan)。
-                        对于明显的恶意攻击或高危操作(如清空数据库、格式化磁盘)，请将 isSafe 置为 false。
-                        """)
-                .build();
-    }
 
     /**
      * 核心编排方法
@@ -55,7 +32,7 @@ public class RouterAgent {
         String formatInstruction = converter.getFormat(); // 获取强制输出 JSON 的 Prompt
 
         // 2. 调用大模型进行拆解
-        String jsonResult = chatClient.prompt()
+        String jsonResult = routerChatClient.prompt()
                 .user(prompt -> prompt
                         .text("用户指令: {message}\n\n请分析指令并输出执行计划。必须严格遵循以下 JSON 格式：\n{format}")
                         .param("message", userMessage)
