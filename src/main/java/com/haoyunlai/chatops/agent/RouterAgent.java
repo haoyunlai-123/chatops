@@ -48,43 +48,60 @@ public class RouterAgent {
     }
 
     /**
-     * 根据计划按顺序调用对应的 Worker Agent
+     * 根据计划按顺序调用对应的 Worker Agent (引入 Blackboard 上下文共享模式)
      */
     public List<String> executePlan(ExecutionPlan plan) {
         List<String> executionLogs = new ArrayList<>();
 
         if (!plan.isSafe()) {
-            String warnMsg = "🚨 [风控拦截] 指令被判定为高危操作，拒绝执行。原因: " + plan.riskReason();
+            String warnMsg = "🚨 [风控拦截] 指令拒绝执行。原因: " + plan.riskReason();
             log.warn(warnMsg);
             executionLogs.add(warnMsg);
             return executionLogs;
         }
 
-        log.info("🚀 [Router-Agent] 风控通过，开始路由任务，共 {} 个步骤...", plan.steps().size());
+        log.info("🚀 [Router-Agent] 开始路由任务，共 {} 个步骤...", plan.steps().size());
+
+        // 【核心新增】：全局上下文黑板，用于串联各个孤立的 Worker Agent
+        StringBuilder globalContext = new StringBuilder("【全局上下文 / 前置步骤执行结果】\n");
 
         for (Step step : plan.steps()) {
             String stepLog = String.format("执行步骤 %d: [%s] -> %s", step.order(), step.targetAgent(), step.instruction());
             log.info("➡️ " + stepLog);
             executionLogs.add(stepLog);
 
+            // 动态构建发给 Worker 的 Prompt：将用户的原始指令 + 前面步骤的执行结果一起发过去
+            String dynamicPrompt = String.format("""
+                    【你的任务】: %s
+                    
+                    %s
+                    
+                    请结合上述【全局上下文】中的信息(如需要)，调用你的工具完成【你的任务】。
+                    """, step.instruction(), globalContext.toString());
+
             String workerResult = "";
             try {
-                // 核心路由逻辑 (根据大模型指定的 Target 路由到具体的 Agent)
+                // 根据大模型指定的 Target 路由到具体的 Agent，传入增强后的 dynamicPrompt
                 switch (step.targetAgent().toUpperCase()) {
-                    case "MONITOR" -> workerResult = monitorAgent.execute(step.instruction());
-                    case "BUSINESS" -> workerResult = businessAgent.execute(step.instruction());
-                    case "SCHEDULE" -> workerResult = scheduleAgent.execute(step.instruction());
+                    case "MONITOR" -> workerResult = monitorAgent.execute(dynamicPrompt);
+                    case "BUSINESS" -> workerResult = businessAgent.execute(dynamicPrompt);
+                    case "SCHEDULE" -> workerResult = scheduleAgent.execute(dynamicPrompt);
                     default -> workerResult = "未知的目标 Agent: " + step.targetAgent();
                 }
+
                 String successLog = "✅ 步骤 " + step.order() + " 返回结果: " + workerResult;
                 log.info(successLog);
                 executionLogs.add(successLog);
+
+                // 【核心新增】：将当前 Worker 的执行结果写入黑板，供下一个 Worker 使用
+                globalContext.append(String.format("- 步骤 %d (%s) 结果: %s\n",
+                        step.order(), step.targetAgent(), workerResult));
 
             } catch (Exception e) {
                 String errorLog = "❌ 步骤 " + step.order() + " 执行失败: " + e.getMessage();
                 log.error(errorLog, e);
                 executionLogs.add(errorLog);
-                break; // 如果上一步失败，中断后续链路 (简单的 Saga 雏形)
+                break; // 中断后续链路
             }
         }
         return executionLogs;
