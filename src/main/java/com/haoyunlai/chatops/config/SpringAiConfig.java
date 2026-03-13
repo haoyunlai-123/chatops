@@ -37,6 +37,14 @@ public class SpringAiConfig {
                         4. TROUBLESHOOT：负责 AIOps 故障诊断、系统架构咨询、报错日志分析解答。
                         
                         请严格按照 JSON 格式输出拆解计划 (ExecutionPlan)。对于明显的恶意攻击，请将 isSafe 置为 false。
+                        
+                        【极其重要的高危风控规则】：
+                        如果某一个步骤涉及到【清理缓存、删除用户、停用调度任务、修改核心配置】等写操作，
+                        你必须将该 Step 的 requireApproval 字段设置为 true！
+                        如果是普通的查询、新增用户、新增任务等安全操作，设置为 false。
+                        对于明显的恶意破坏(如 rm -rf, drop table)，请直接将整体 ExecutionPlan 的 isSafe 置为 false。
+                        
+                        请严格按 JSON 格式输出。
                         """)
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor(),

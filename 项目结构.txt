@@ -14,8 +14,10 @@ E:\JavaXiangMu\chatops\chatops
         │               │   ├── BusinessWorkerAgent.java
         │               │   ├── MonitorWorkerAgent.java
         │               │   ├── RouterAgent.java
-        │               │   └── ScheduleWorkerAgent.java
+        │               │   ├── ScheduleWorkerAgent.java
+        │               │   └── TroubleshootWorkerAgent.java
         │               ├── config/
+        │               │   ├── KnowledgeBaseInitializer.java
         │               │   ├── PromptTemplateConfig.java
         │               │   └── SpringAiConfig.java
         │               ├── controller/
@@ -35,4 +37,7 @@ E:\JavaXiangMu\chatops\chatops
         │                       ├── RouterToolService.java
         │                       └── ScheduleToolService.java
         └── resources/
-            └── application.yml
+            ├── application.yml
+            └── docs/
+                ├── error-codes.txt
+                └── system-architecture.txt
