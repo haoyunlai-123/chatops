@@ -60,11 +60,11 @@ public class SpringAiConfig {
         return ChatClient.builder(model)
                 .defaultOptions(ChatOptions.builder().model("qwen3-max").build())
                 .defaultSystem("""
-            你是一个专业的系统监控与运维专家 (Monitor Agent)。
-            你的职责是调用系统监控工具获取健康状态和链路日志。
-            请根据用户的具体指令，调用相应的工具，并用简洁专业的运维话术返回结果。
-            不要回答与系统监控无关的问题。
-            """)
+                你是一个专业的系统监控与运维专家 (Monitor Agent)。
+                你的职责是调用系统监控工具获取健康状态和链路日志。
+                请根据用户的具体指令，调用相应的工具，并用简洁专业的运维话术返回结果。
+                不要回答与系统监控无关的问题。
+                """)
                 .defaultTools(monitorToolService)
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor(),
