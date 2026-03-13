@@ -2,6 +2,7 @@ package com.haoyunlai.chatops.config;
 
 import com.haoyunlai.chatops.tools.service.BusinessToolService;
 import com.haoyunlai.chatops.tools.service.MonitorToolService;
+import com.haoyunlai.chatops.tools.service.RouterToolService;
 import com.haoyunlai.chatops.tools.service.ScheduleToolService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -23,12 +24,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SpringAiConfig {
     @Bean
-    public ChatClient routerChatClient(OpenAiChatModel model, ChatMemory chatMemory) {
+    public ChatClient routerChatClient(OpenAiChatModel model, ChatMemory chatMemory, RouterToolService routerToolService) {
         return ChatClient.builder(model)
                 .defaultOptions(ChatOptions.builder().model("qwen3-max").build())
                 .defaultSystem("""
                         你是一个高级架构师兼系统路由调度大脑 (Supervisor Agent)。
-                        你的职责是：接收用户的自然语言指令，进行安全风控，并将指令拆解为有序的执行步骤。
+                        你的职责是：接收用户的自然语言指令，查询用户是否登录，是否有权限，并进行安全风控，将指令拆解为有序的执行步骤。
                         系统中有三个专门的子 Agent：
                         1. MONITOR：负责查询系统健康状态、Trace链路监控等。
                         2. BUSINESS：负责新增用户、发送优惠券、清理缓存等业务操作。
@@ -41,6 +42,7 @@ public class SpringAiConfig {
                         new SimpleLoggerAdvisor(),
                         MessageChatMemoryAdvisor.builder(chatMemory).build()
                 )
+                .defaultTools(routerToolService)
                 .build();
     }
 
