@@ -20,6 +20,7 @@ public class RouterAgent {
     private final MonitorWorkerAgent monitorAgent;
     private final BusinessWorkerAgent businessAgent;
     private final ScheduleWorkerAgent scheduleAgent;
+    private final TroubleshootWorkerAgent troubleshootAgent;
 
     /**
      * 核心编排方法
@@ -86,6 +87,7 @@ public class RouterAgent {
                     case "MONITOR" -> workerResult = monitorAgent.execute(dynamicPrompt);
                     case "BUSINESS" -> workerResult = businessAgent.execute(dynamicPrompt);
                     case "SCHEDULE" -> workerResult = scheduleAgent.execute(dynamicPrompt);
+                    case "TROUBLESHOOT" -> workerResult = troubleshootAgent.execute(dynamicPrompt);
                     default -> workerResult = "未知的目标 Agent: " + step.targetAgent();
                 }
 

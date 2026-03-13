@@ -1,0 +1,17 @@
+【系统核心架构文档】
+当前分布式任务调度系统主要由三个核心组件构成：自研HTTP网关、自研RPC框架、分布式调度中心。
+
+1. HTTP网关层：
+基于 Netty + 异步 HTTP 客户端实现。所有的外部请求必须经过网关的责任链过滤器。
+核心过滤器顺序：Route(路由) -> Auth(鉴权) -> LoadBalance(负载均衡) -> Retry(重试) -> Proxy(转发)。
+网关采用平滑加权轮询(SWRR)算法分配流量，并使用 Copy-On-Write 机制实现路由表热更新。
+
+2. 自研RPC框架：
+使用 ZooKeeper 作为服务注册与发现中心。客户端具有本地缓存，通过 ZK 的 Watcher 机制实现动态更新。
+通信协议基于自定义的 TCP 粘包/拆包解码器。序列化支持 Kryo 和 Protostuff。
+执行器节点(ExecutorNode)本质上是一个 RPC 的通用泛化调用代理。
+
+3. 分布式调度中心：
+采用 Job / JobInstance / ExecutorNode 三层模型。
+任务状态机流转过程为：WAITING -> RUNNING -> SUCCESS / TIMEOUT / RETRYING。
+采用数据库悲观锁/乐观锁防止多 Admin 节点时的任务重复触发。

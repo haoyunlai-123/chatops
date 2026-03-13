@@ -30,13 +30,13 @@ public class SpringAiConfig {
                 .defaultSystem("""
                         你是一个高级架构师兼系统路由调度大脑 (Supervisor Agent)。
                         你的职责是：接收用户的自然语言指令，查询用户是否登录，是否有权限，并进行安全风控，将指令拆解为有序的执行步骤。
-                        系统中有三个专门的子 Agent：
+                        系统中有四个专门的子 Agent：
                         1. MONITOR：负责查询系统健康状态、Trace链路监控等。
                         2. BUSINESS：负责新增用户、发送优惠券、清理缓存等业务操作。
                         3. SCHEDULE：负责在分布式调度中心动态创建、启停定时任务。
+                        4. TROUBLESHOOT：负责 AIOps 故障诊断、系统架构咨询、报错日志分析解答。
                         
-                        请严格按照 JSON 格式输出拆解计划 (ExecutionPlan)。
-                        对于明显的恶意攻击或高危操作(如清空数据库、格式化磁盘)，请将 isSafe 置为 false。
+                        请严格按照 JSON 格式输出拆解计划 (ExecutionPlan)。对于明显的恶意攻击，请将 isSafe 置为 false。
                         """)
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor(),
@@ -96,6 +96,32 @@ public class SpringAiConfig {
                 .defaultAdvisors(
                         new SimpleLoggerAdvisor(),
                         MessageChatMemoryAdvisor.builder(chatMemory).build()
+                )
+                .build();
+    }
+
+    @Bean
+    public ChatClient troubleshootChatClient(OpenAiChatModel model, ChatMemory chatMemory, VectorStore vectorStore) {
+        return ChatClient.builder(model)
+                .defaultOptions(ChatOptions.builder().model("qwen3-max").build()) // 或者 deepseek-chat
+                .defaultSystem("""
+                        你是一个资深的 AIOps 故障排查专家 (Troubleshoot Agent)。
+                        你的主要职责是根据【向量知识库】中检索出的系统架构文档和报错日志，为用户提供专业的诊断建议和排查步骤。
+                        回答要求：
+                        1. 语气专业、冷静。
+                        2. 给出明确的原因分析。
+                        3. 给出分步的排查建议(Runbook)。
+                        如果检索到的资料中没有相关信息，请直接说明“未在系统知识库中找到该错误信息”。
+                        """)
+                .defaultAdvisors(
+                        new SimpleLoggerAdvisor(),
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        // 【黑魔法】：自动拦截用户的提问，去 VectorStore 检索相似文本，并作为上下文喂给大模型！
+                        QuestionAnswerAdvisor.builder(vectorStore).searchRequest(
+                                SearchRequest.builder()
+                                        .similarityThreshold(0.6)
+                                        .topK(2)
+                                        .build()).build()
                 )
                 .build();
     }
