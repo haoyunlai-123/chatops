@@ -3,6 +3,7 @@ package com.haoyunlai.chatops.controller;
 import com.haoyunlai.chatops.model.ChatRequest;
 import com.haoyunlai.chatops.model.task.ApproveTaskRequest;
 import com.haoyunlai.chatops.model.task.ApproveTaskResponse;
+import com.haoyunlai.chatops.model.task.CancelTaskResponse;
 import com.haoyunlai.chatops.model.task.RetryTaskResponse;
 import com.haoyunlai.chatops.model.task.SubmitTaskResponse;
 import com.haoyunlai.chatops.model.task.TaskPageResponse;
@@ -91,11 +92,26 @@ public class ChatAgentController {
     public RetryTaskResponse retryTask(@PathVariable String executionId) {
         try {
             String newExecutionId = chatopsTaskService.retryTask(executionId);
-            return new RetryTaskResponse(executionId, newExecutionId, "ACCEPTED", "重试任务已提交");
+            return new RetryTaskResponse(executionId, newExecutionId, "ACCEPTED", "重试任务已提交，最大重试次数: " + ChatopsTaskService.MAX_RETRY_COUNT);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
+    }
+
+    /**
+     * 5) 取消任务 (软取消)
+     */
+    @PostMapping("/tasks/{executionId}/cancel")
+    public CancelTaskResponse cancelTask(@PathVariable String executionId) {
+        if (executionStateStore.get(executionId) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "执行任务不存在: " + executionId);
+        }
+        boolean canceled = chatopsTaskService.cancelTask(executionId);
+        if (!canceled) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "任务当前状态不允许取消: " + executionId);
+        }
+        return new CancelTaskResponse(executionId, "CANCELED", "任务已软取消");
     }
 }

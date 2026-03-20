@@ -6,5 +6,6 @@ public enum ExecutionStatus {
     SUSPENDED,
     SUCCEEDED,
     FAILED,
-    BLOCKED
+    BLOCKED,
+    CANCELED
 }

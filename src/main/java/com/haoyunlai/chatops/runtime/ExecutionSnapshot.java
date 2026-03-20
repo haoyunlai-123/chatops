@@ -17,6 +17,9 @@ import java.time.Instant;
 public record ExecutionSnapshot(
         String executionId,
         String userMessage,
+        int retryCount,
+        String sourceExecutionId,
+        String rootExecutionId,
         String intent,
         int totalSteps,
         int currentStep,

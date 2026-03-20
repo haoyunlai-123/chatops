@@ -22,12 +22,21 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
 
     @Override
     public void init(String executionId, String userMessage) {
+        init(executionId, userMessage, 0, null, executionId);
+    }
+
+    @Override
+    public void init(String executionId, String userMessage, int retryCount, String sourceExecutionId, String rootExecutionId) {
         String sql = """
                 INSERT INTO agent_execution_state
-                (execution_id, user_message, intent, total_steps, current_step, status, approval_token, last_message, updated_at)
-                VALUES (?, ?, NULL, 0, 0, ?, NULL, ?, ?)
+                (execution_id, user_message, retry_count, source_execution_id, root_execution_id,
+                 intent, total_steps, current_step, status, approval_token, last_message, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, 0, 0, ?, NULL, ?, ?)
                 ON DUPLICATE KEY UPDATE
                   user_message = VALUES(user_message),
+                  retry_count = VALUES(retry_count),
+                  source_execution_id = VALUES(source_execution_id),
+                  root_execution_id = VALUES(root_execution_id),
                   status = VALUES(status),
                   last_message = VALUES(last_message),
                   updated_at = VALUES(updated_at)
@@ -35,6 +44,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         jdbcTemplate.update(sql,
                 executionId,
                 userMessage,
+                retryCount,
+                sourceExecutionId,
+                rootExecutionId,
                 ExecutionStatus.PENDING.name(),
                 "任务已创建，等待执行",
                 Timestamp.from(Instant.now()));
@@ -49,6 +61,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         upsert(new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 intent != null ? intent : old.intent(),
                 totalSteps > 0 ? totalSteps : old.totalSteps(),
                 currentStep,
@@ -68,6 +83,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         upsert(new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 old.totalSteps(),
                 currentStep,
@@ -87,6 +105,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         upsert(new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 old.totalSteps(),
                 old.currentStep(),
@@ -106,6 +127,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         upsert(new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 old.totalSteps(),
                 currentStep,
@@ -125,6 +149,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         upsert(new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 totalSteps,
                 totalSteps,
@@ -136,10 +163,36 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
     }
 
     @Override
+    public boolean markCanceled(String executionId, String message) {
+        ExecutionSnapshot old = get(executionId);
+        if (old == null) {
+            return false;
+        }
+        if (old.status() == ExecutionStatus.SUCCEEDED || old.status() == ExecutionStatus.FAILED || old.status() == ExecutionStatus.BLOCKED) {
+            return false;
+        }
+        upsert(new ExecutionSnapshot(
+                old.executionId(),
+                old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
+                old.intent(),
+                old.totalSteps(),
+                old.currentStep(),
+                ExecutionStatus.CANCELED,
+                old.approvalToken(),
+                message,
+                Instant.now()
+        ));
+        return true;
+    }
+
+    @Override
     public ExecutionSnapshot get(String executionId) {
         String sql = """
-                SELECT execution_id, user_message, intent, total_steps, current_step, status,
-                       approval_token, last_message, updated_at
+                SELECT execution_id, user_message, retry_count, source_execution_id, root_execution_id,
+                       intent, total_steps, current_step, status, approval_token, last_message, updated_at
                 FROM agent_execution_state
                 WHERE execution_id = ?
                 """;
@@ -154,8 +207,8 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         int offset = (safePage - 1) * safeSize;
 
         String sql = """
-                SELECT execution_id, user_message, intent, total_steps, current_step, status,
-                       approval_token, last_message, updated_at
+                SELECT execution_id, user_message, retry_count, source_execution_id, root_execution_id,
+                       intent, total_steps, current_step, status, approval_token, last_message, updated_at
                 FROM agent_execution_state
                 ORDER BY updated_at DESC
                 LIMIT ? OFFSET ?
@@ -172,10 +225,14 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
     private void upsert(ExecutionSnapshot snapshot) {
         String sql = """
                 INSERT INTO agent_execution_state
-                (execution_id, user_message, intent, total_steps, current_step, status, approval_token, last_message, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (execution_id, user_message, retry_count, source_execution_id, root_execution_id,
+                 intent, total_steps, current_step, status, approval_token, last_message, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                   user_message = VALUES(user_message),
+                  retry_count = VALUES(retry_count),
+                  source_execution_id = VALUES(source_execution_id),
+                  root_execution_id = VALUES(root_execution_id),
                   intent = VALUES(intent),
                   total_steps = VALUES(total_steps),
                   current_step = VALUES(current_step),
@@ -187,6 +244,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         jdbcTemplate.update(sql,
                 snapshot.executionId(),
                 snapshot.userMessage(),
+                snapshot.retryCount(),
+                snapshot.sourceExecutionId(),
+                snapshot.rootExecutionId(),
                 snapshot.intent(),
                 snapshot.totalSteps(),
                 snapshot.currentStep(),
@@ -201,6 +261,9 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         return new ExecutionSnapshot(
                 rs.getString("execution_id"),
                 rs.getString("user_message"),
+                rs.getInt("retry_count"),
+                rs.getString("source_execution_id"),
+                rs.getString("root_execution_id"),
                 rs.getString("intent"),
                 rs.getInt("total_steps"),
                 rs.getInt("current_step"),

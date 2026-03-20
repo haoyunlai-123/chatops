@@ -22,6 +22,9 @@ public class RuntimeTableInitializer implements ApplicationRunner {
                 CREATE TABLE IF NOT EXISTS agent_execution_state (
                   execution_id VARCHAR(64) PRIMARY KEY,
                   user_message TEXT,
+                  retry_count INT NOT NULL DEFAULT 0,
+                  source_execution_id VARCHAR(64),
+                  root_execution_id VARCHAR(64),
                   intent VARCHAR(255),
                   total_steps INT NOT NULL,
                   current_step INT NOT NULL,
@@ -31,6 +34,11 @@ public class RuntimeTableInitializer implements ApplicationRunner {
                   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
                 """);
+
+        // 兼容已存在的旧表结构
+        jdbcTemplate.execute("ALTER TABLE agent_execution_state ADD COLUMN IF NOT EXISTS retry_count INT NOT NULL DEFAULT 0");
+        jdbcTemplate.execute("ALTER TABLE agent_execution_state ADD COLUMN IF NOT EXISTS source_execution_id VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE agent_execution_state ADD COLUMN IF NOT EXISTS root_execution_id VARCHAR(64)");
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS agent_suspension (

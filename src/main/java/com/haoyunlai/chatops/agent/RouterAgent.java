@@ -2,7 +2,9 @@ package com.haoyunlai.chatops.agent;
 
 import com.haoyunlai.chatops.model.plan.ExecutionPlan;
 import com.haoyunlai.chatops.model.plan.Step;
+import com.haoyunlai.chatops.runtime.ExecutionSnapshot;
 import com.haoyunlai.chatops.runtime.ExecutionStateStore;
+import com.haoyunlai.chatops.runtime.ExecutionStatus;
 import com.haoyunlai.chatops.runtime.SuspensionContext;
 import com.haoyunlai.chatops.runtime.SuspensionStore;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +70,11 @@ public class RouterAgent {
             out.accept("❌ 审批 Token 无效或已过期！");
             return;
         }
+        ExecutionSnapshot snapshot = executionStateStore.get(context.executionId());
+        if (snapshot != null && snapshot.status() == ExecutionStatus.CANCELED) {
+            out.accept("🚫 当前任务已被取消，审批恢复已忽略。");
+            return;
+        }
         executionStateStore.markRunning(
                 context.executionId(),
                 context.plan().intent(),
@@ -90,6 +97,12 @@ public class RouterAgent {
         }
 
         for (int i = startIndex; i < plan.steps().size(); i++) {
+            ExecutionSnapshot snapshot = executionStateStore.get(executionId);
+            if (snapshot != null && snapshot.status() == ExecutionStatus.CANCELED) {
+                out.accept("🚫 检测到任务已取消，终止后续步骤执行。");
+                return;
+            }
+
             Step step = plan.steps().get(i);
 
             // 【HITL 挂起逻辑】
@@ -111,13 +124,12 @@ public class RouterAgent {
 
             String basePrompt = String.format("【你的任务】: %s\n\n%s", step.instruction(), globalContext.toString());
             int maxRetries = 3;
-            int currentRetry = 0;
             boolean stepSuccess = false;
             String workerResult = "";
             String lastErrorMessage = "";
 
             // 【反思重试逻辑】
-            while (currentRetry < maxRetries && !stepSuccess) {
+            for (int currentRetry = 0; currentRetry < maxRetries && !stepSuccess; currentRetry++) {
                 try {
                     String dynamicPrompt = basePrompt;
                     if (currentRetry > 0) {
@@ -134,9 +146,8 @@ public class RouterAgent {
                     }
                     stepSuccess = true;
                 } catch (Exception e) {
-                    currentRetry++;
                     lastErrorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
-                    if (currentRetry >= maxRetries) {
+                    if (currentRetry >= maxRetries - 1) {
                         executionStateStore.markFailed(executionId, i + 1, "步骤失败: " + lastErrorMessage);
                         out.accept("❌ 步骤 " + step.order() + " 经过多次反思重试依然失败。中止整个任务链路。");
                         return; // 彻底失败，退出引擎

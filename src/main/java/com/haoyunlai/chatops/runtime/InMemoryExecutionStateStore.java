@@ -17,9 +17,17 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
 
     @Override
     public void init(String executionId, String userMessage) {
+        init(executionId, userMessage, 0, null, executionId);
+    }
+
+    @Override
+    public void init(String executionId, String userMessage, int retryCount, String sourceExecutionId, String rootExecutionId) {
         states.put(executionId, new ExecutionSnapshot(
                 executionId,
                 userMessage,
+                retryCount,
+                sourceExecutionId,
+                rootExecutionId,
                 null,
                 0,
                 0,
@@ -39,6 +47,9 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
         states.put(executionId, new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 intent != null ? intent : old.intent(),
                 totalSteps > 0 ? totalSteps : old.totalSteps(),
                 currentStep,
@@ -58,6 +69,9 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
         states.put(executionId, new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 old.totalSteps(),
                 currentStep,
@@ -77,6 +91,9 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
         states.put(executionId, new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 old.totalSteps(),
                 old.currentStep(),
@@ -96,6 +113,9 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
         states.put(executionId, new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 old.totalSteps(),
                 currentStep,
@@ -115,6 +135,9 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
         states.put(executionId, new ExecutionSnapshot(
                 old.executionId(),
                 old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
                 old.intent(),
                 totalSteps,
                 totalSteps,
@@ -123,6 +146,32 @@ public class InMemoryExecutionStateStore implements ExecutionStateStore {
                 message,
                 Instant.now()
         ));
+    }
+
+    @Override
+    public boolean markCanceled(String executionId, String message) {
+        ExecutionSnapshot old = states.get(executionId);
+        if (old == null) {
+            return false;
+        }
+        if (old.status() == ExecutionStatus.SUCCEEDED || old.status() == ExecutionStatus.FAILED || old.status() == ExecutionStatus.BLOCKED) {
+            return false;
+        }
+        states.put(executionId, new ExecutionSnapshot(
+                old.executionId(),
+                old.userMessage(),
+                old.retryCount(),
+                old.sourceExecutionId(),
+                old.rootExecutionId(),
+                old.intent(),
+                old.totalSteps(),
+                old.currentStep(),
+                ExecutionStatus.CANCELED,
+                old.approvalToken(),
+                message,
+                Instant.now()
+        ));
+        return true;
     }
 
     @Override
