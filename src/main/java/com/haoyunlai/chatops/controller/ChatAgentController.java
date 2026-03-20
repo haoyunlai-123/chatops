@@ -4,6 +4,7 @@ import com.haoyunlai.chatops.model.ChatRequest;
 import com.haoyunlai.chatops.model.task.ApproveTaskRequest;
 import com.haoyunlai.chatops.model.task.ApproveTaskResponse;
 import com.haoyunlai.chatops.model.task.SubmitTaskResponse;
+import com.haoyunlai.chatops.model.task.TaskPageResponse;
 import com.haoyunlai.chatops.runtime.ExecutionSnapshot;
 import com.haoyunlai.chatops.runtime.ExecutionStateStore;
 import com.haoyunlai.chatops.service.ChatopsTaskService;
@@ -45,6 +46,27 @@ public class ChatAgentController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "执行任务不存在: " + executionId);
         }
         return snapshot;
+    }
+
+    /**
+     * 2.1) 分页查询最近任务
+     */
+    @GetMapping("/tasks")
+    public TaskPageResponse listTasks(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        if (page < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 必须 >= 1");
+        }
+        if (size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size 必须在 1~100 之间");
+        }
+        return new TaskPageResponse(
+                page,
+                size,
+                executionStateStore.countAll(),
+                executionStateStore.listRecent(page, size)
+        );
     }
 
     /**

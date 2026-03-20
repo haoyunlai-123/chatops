@@ -1,5 +1,7 @@
 package com.haoyunlai.chatops.runtime;
 
+import java.util.List;
+
 public interface ExecutionStateStore {
 
     void init(String executionId, String userMessage);
@@ -15,4 +17,8 @@ public interface ExecutionStateStore {
     void markSucceeded(String executionId, int totalSteps, String message);
 
     ExecutionSnapshot get(String executionId);
+
+    List<ExecutionSnapshot> listRecent(int page, int size);
+
+    long countAll();
 }

@@ -147,6 +147,28 @@ public class JdbcExecutionStateStore implements ExecutionStateStore {
         return snapshots.isEmpty() ? null : snapshots.get(0);
     }
 
+    @Override
+    public List<ExecutionSnapshot> listRecent(int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        int offset = (safePage - 1) * safeSize;
+
+        String sql = """
+                SELECT execution_id, user_message, intent, total_steps, current_step, status,
+                       approval_token, last_message, updated_at
+                FROM agent_execution_state
+                ORDER BY updated_at DESC
+                LIMIT ? OFFSET ?
+                """;
+        return jdbcTemplate.query(sql, this::mapSnapshot, safeSize, offset);
+    }
+
+    @Override
+    public long countAll() {
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM agent_execution_state", Long.class);
+        return total == null ? 0L : total;
+    }
+
     private void upsert(ExecutionSnapshot snapshot) {
         String sql = """
                 INSERT INTO agent_execution_state
