@@ -1,5 +1,6 @@
 package com.haoyunlai.chatops.runtime;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -7,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@ConditionalOnMissingBean(ExecutionStateStore.class)
 public class InMemoryExecutionStateStore implements ExecutionStateStore {
 
     private final Map<String, ExecutionSnapshot> states = new ConcurrentHashMap<>();
