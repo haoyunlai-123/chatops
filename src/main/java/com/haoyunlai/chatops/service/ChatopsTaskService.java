@@ -3,6 +3,8 @@ package com.haoyunlai.chatops.service;
 import com.haoyunlai.chatops.agent.RouterAgent;
 import com.haoyunlai.chatops.model.ChatRequest;
 import com.haoyunlai.chatops.model.plan.ExecutionPlan;
+import com.haoyunlai.chatops.runtime.ExecutionStatus;
+import com.haoyunlai.chatops.runtime.ExecutionSnapshot;
 import com.haoyunlai.chatops.runtime.ExecutionStateStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +23,18 @@ public class ChatopsTaskService {
     private final ExecutionStateStore executionStateStore;
 
     public String submitTask(ChatRequest request) {
-        String executionId = "EXE-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        executionStateStore.init(executionId, request.message());
+        return submitTaskByMessage(request.message());
+    }
 
-        CompletableFuture.runAsync(() -> executeTask(executionId, request.message()));
-        return executionId;
+    public String retryTask(String sourceExecutionId) {
+        ExecutionSnapshot source = executionStateStore.get(sourceExecutionId);
+        if (source == null) {
+            throw new IllegalArgumentException("源任务不存在: " + sourceExecutionId);
+        }
+        if (source.status() == null || source.status() == ExecutionStatus.RUNNING || source.status() == ExecutionStatus.PENDING) {
+            throw new IllegalStateException("当前任务仍在执行中，不能重试: " + sourceExecutionId);
+        }
+        return submitTaskByMessage(source.userMessage());
     }
 
     public void approveTask(String token) {
@@ -48,6 +57,13 @@ public class ChatopsTaskService {
             log.error("💥 执行任务异常, executionId={}", executionId, e);
             executionStateStore.markFailed(executionId, 0, "执行异常: " + e.getMessage());
         }
+    }
+
+    private String submitTaskByMessage(String userMessage) {
+        String executionId = "EXE-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        executionStateStore.init(executionId, userMessage);
+        CompletableFuture.runAsync(() -> executeTask(executionId, userMessage));
+        return executionId;
     }
 
     private void logProgress(String message) {

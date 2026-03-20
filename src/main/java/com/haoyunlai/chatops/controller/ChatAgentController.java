@@ -3,6 +3,7 @@ package com.haoyunlai.chatops.controller;
 import com.haoyunlai.chatops.model.ChatRequest;
 import com.haoyunlai.chatops.model.task.ApproveTaskRequest;
 import com.haoyunlai.chatops.model.task.ApproveTaskResponse;
+import com.haoyunlai.chatops.model.task.RetryTaskResponse;
 import com.haoyunlai.chatops.model.task.SubmitTaskResponse;
 import com.haoyunlai.chatops.model.task.TaskPageResponse;
 import com.haoyunlai.chatops.runtime.ExecutionSnapshot;
@@ -81,5 +82,20 @@ public class ChatAgentController {
         log.info("🔑 收到异步审批请求, token={}", request.token());
         chatopsTaskService.approveTask(request.token());
         return new ApproveTaskResponse(request.token(), "ACCEPTED", "审批请求已接收，任务将异步恢复执行");
+    }
+
+    /**
+     * 4) 重试任务 (异步)
+     */
+    @PostMapping("/tasks/{executionId}/retry")
+    public RetryTaskResponse retryTask(@PathVariable String executionId) {
+        try {
+            String newExecutionId = chatopsTaskService.retryTask(executionId);
+            return new RetryTaskResponse(executionId, newExecutionId, "ACCEPTED", "重试任务已提交");
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
     }
 }
