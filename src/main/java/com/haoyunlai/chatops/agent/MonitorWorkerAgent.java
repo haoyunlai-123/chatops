@@ -1,11 +1,12 @@
 package com.haoyunlai.chatops.agent;
 
-import com.haoyunlai.chatops.tools.service.MonitorToolService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
+@Slf4j
 @Component
 public class MonitorWorkerAgent {
 
@@ -13,7 +14,7 @@ public class MonitorWorkerAgent {
 
 
     public String execute(String taskInstruction) {
-        System.out.println("🤖 [Monitor-Agent] 正在执行子任务: " + taskInstruction);
+        log.info("🤖 [Monitor-Agent] 正在执行子任务: {}", taskInstruction);
         return monitorChatClient.prompt()
                 .user(taskInstruction)
                 .call()

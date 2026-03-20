@@ -1,10 +1,12 @@
 package com.haoyunlai.chatops.agent;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
+@Slf4j
 @Component
 public class TroubleshootWorkerAgent {
 
@@ -12,7 +14,7 @@ public class TroubleshootWorkerAgent {
 
 
     public String execute(String taskInstruction) {
-        System.out.println("🤖 [Troubleshoot-Agent] 正在进行系统诊断/RAG检索: " + taskInstruction);
+        log.info("🤖 [Troubleshoot-Agent] 正在进行系统诊断/RAG检索: {}", taskInstruction);
         return troubleshootChatClient.prompt()
                 .user(taskInstruction)
                 .call()

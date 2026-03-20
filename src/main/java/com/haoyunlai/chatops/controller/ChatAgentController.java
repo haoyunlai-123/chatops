@@ -3,12 +3,15 @@ package com.haoyunlai.chatops.controller;
 import com.haoyunlai.chatops.agent.RouterAgent;
 import com.haoyunlai.chatops.model.ChatRequest;
 import com.haoyunlai.chatops.model.plan.ExecutionPlan;
+import com.haoyunlai.chatops.runtime.ExecutionSnapshot;
+import com.haoyunlai.chatops.runtime.ExecutionStateStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -18,9 +21,11 @@ import java.util.function.Consumer;
 public class ChatAgentController {
 
     private final RouterAgent routerAgent;
+    private final ExecutionStateStore executionStateStore;
 
-    public ChatAgentController(RouterAgent routerAgent) {
+    public ChatAgentController(RouterAgent routerAgent, ExecutionStateStore executionStateStore) {
         this.routerAgent = routerAgent;
+        this.executionStateStore = executionStateStore;
     }
 
     /**
@@ -29,6 +34,8 @@ public class ChatAgentController {
     @PostMapping(value = "/execute", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter executeCommandStream(@RequestBody ChatRequest request) {
         log.info("📩 收到用户请求: {}", request.message());
+        String executionId = "EXE-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        executionStateStore.init(executionId, request.message());
 
         // 设置超时时间为 10 分钟 (防止复杂的 Agent 思考太久断连)
         SseEmitter emitter = new SseEmitter(10 * 60 * 1000L);
@@ -38,23 +45,33 @@ public class ChatAgentController {
             try {
                 // 定义一个发送消息到前端的回调函数
                 Consumer<String> out = msg -> sendToEmitter(emitter, msg);
+                out.accept("🆔 executionId: " + executionId);
 
                 // 第一步：大脑拆解意图
                 ExecutionPlan plan = routerAgent.generatePlan(request.message(), out);
 
                 // 第二步：执行状态机
-                routerAgent.executePlan(plan, out);
+                routerAgent.executePlan(executionId, plan, out);
 
                 // 执行结束，关闭流
                 emitter.complete();
             } catch (Exception e) {
                 log.error("💥 执行流发生异常", e);
+                executionStateStore.markFailed(executionId, 0, "执行异常: " + e.getMessage());
                 sendToEmitter(emitter, "💥 系统异常: " + e.getMessage());
                 emitter.completeWithError(e);
             }
         });
 
         return emitter;
+    }
+
+    /**
+     * 1.1 查询执行状态 (第一阶段使用内存态假实现)
+     */
+    @GetMapping("/status/{executionId}")
+    public ExecutionSnapshot getExecutionStatus(@PathVariable String executionId) {
+        return executionStateStore.get(executionId);
     }
 
     /**
